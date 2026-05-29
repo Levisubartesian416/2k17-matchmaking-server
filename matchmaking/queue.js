@@ -85,29 +85,13 @@ class QueueManager {
 
         if (mode === '1v1' && queue.size >= 2) {
             const entries = Array.from(queue.entries());
-            
-            // Find two compatible players (at least one must have the game)
-            let p1Index = -1, p2Index = -1;
-            for(let i=0; i<entries.length; i++) {
-                for(let j=i+1; j<entries.length; j++) {
-                    if (entries[i][1].hasGame || entries[j][1].hasGame) {
-                        p1Index = i;
-                        p2Index = j;
-                        break;
-                    }
-                }
-                if (p1Index !== -1) break;
-            }
+            const [socket1, player1] = entries[0];
+            const [socket2, player2] = entries[1];
 
-            if (p1Index !== -1 && p2Index !== -1) {
-                const [socket1, player1] = entries[p1Index];
-                const [socket2, player2] = entries[p2Index];
-                
-                queue.delete(socket1);
-                queue.delete(socket2);
+            queue.delete(socket1);
+            queue.delete(socket2);
 
-                return this.createMatch(mode, player1, player2);
-            }
+            return this.createMatch(mode, player1, player2);
         }
 
         if (mode === '2v2' && queue.size >= 4) {
