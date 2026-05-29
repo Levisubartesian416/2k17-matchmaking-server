@@ -30,10 +30,11 @@ class QueueManager {
             }
         }
 
-        // Check if in active match
+        // Check if in active match and auto-cancel it if they are stuck
         const activeMatch = db.getActiveMatch(userId);
         if (activeMatch) {
-            return { error: 'Already in an active match' };
+            console.log(`[QUEUE] Auto-canceling stuck match for ${userId}`);
+            this.cancelMatchByUser(userId);
         }
 
         // Check if banned
