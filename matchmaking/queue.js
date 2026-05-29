@@ -17,7 +17,7 @@ class QueueManager {
         setInterval(() => this.cleanStaleEntries(), 30000);
     }
 
-    addToQueue(mode, userId, socketId) {
+    addToQueue(mode, userId, socketId, hasGame = false) {
         const queue = this.queues[mode];
         if (!queue) return { error: 'Invalid mode' };
 
@@ -45,10 +45,11 @@ class QueueManager {
         queue.set(socketId, {
             userId,
             socketId,
+            hasGame,
             queuedAt: Date.now()
         });
 
-        console.log(`[QUEUE] ${user.display_name} joined ${mode} queue (${queue.size} in queue)`);
+        console.log(`[QUEUE] ${user.display_name} joined ${mode} queue (${queue.size} in queue) (hasGame: ${hasGame})`);
 
         // Try to find a match
         return this.tryMatch(mode);
@@ -83,13 +84,29 @@ class QueueManager {
 
         if (mode === '1v1' && queue.size >= 2) {
             const entries = Array.from(queue.entries());
-            const [socket1, player1] = entries[0];
-            const [socket2, player2] = entries[1];
+            
+            // Find two compatible players (at least one must have the game)
+            let p1Index = -1, p2Index = -1;
+            for(let i=0; i<entries.length; i++) {
+                for(let j=i+1; j<entries.length; j++) {
+                    if (entries[i][1].hasGame || entries[j][1].hasGame) {
+                        p1Index = i;
+                        p2Index = j;
+                        break;
+                    }
+                }
+                if (p1Index !== -1) break;
+            }
 
-            queue.delete(socket1);
-            queue.delete(socket2);
+            if (p1Index !== -1 && p2Index !== -1) {
+                const [socket1, player1] = entries[p1Index];
+                const [socket2, player2] = entries[p2Index];
+                
+                queue.delete(socket1);
+                queue.delete(socket2);
 
-            return this.createMatch(mode, player1, player2);
+                return this.createMatch(mode, player1, player2);
+            }
         }
 
         if (mode === '2v2' && queue.size >= 4) {
@@ -109,8 +126,17 @@ class QueueManager {
 
         if (!user1 || !user2) return { error: 'Player not found' };
 
-        // Randomly pick host
-        const hostIsPlayer1 = Math.random() > 0.5;
+        // Select host based on who has the game
+        let hostIsPlayer1;
+        if (player1Entry.hasGame && !player2Entry.hasGame) {
+            hostIsPlayer1 = true;
+        } else if (!player1Entry.hasGame && player2Entry.hasGame) {
+            hostIsPlayer1 = false;
+        } else {
+            // If both have it (or neither, though tryMatch prevents neither), pick randomly
+            hostIsPlayer1 = Math.random() > 0.5;
+        }
+
         const host = hostIsPlayer1 ? user1 : user2;
         const guest = hostIsPlayer1 ? user2 : user1;
 
