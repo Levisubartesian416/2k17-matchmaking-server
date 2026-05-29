@@ -59,8 +59,8 @@ io.on('connection', (socket) => {
 
     // ── Join queue ──
     socket.on('join_queue', (data) => {
-        const { mode } = data; // '1v1' or '2v2'
-        const result = queueManager.addToQueue(mode, socket.userId, socket.id);
+        const { mode, hasGame } = data; // '1v1' or '2v2'
+        const result = queueManager.addToQueue(mode, socket.userId, socket.id, hasGame);
 
         if (result.error) {
             socket.emit('queue_error', { error: result.error });
