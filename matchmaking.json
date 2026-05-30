@@ -1,0 +1,43 @@
+{
+  "users": [
+    {
+      "id": "863e21e6-8ad8-41e5-a3fb-3dc51dd5f8a4",
+      "discord_id": "1220506261754216488",
+      "discord_username": "4x.dan",
+      "discord_avatar": "https://cdn.discordapp.com/avatars/1220506261754216488/3b24839e685ceb42a978e15447f9e167.png",
+      "display_name": "4x.dan",
+      "parsec_link": "https://parsec.gg/g/3ENswMacKuUNDvNqVatM9CZszUM/f333042d/",
+      "elo": 1000,
+      "wins": 0,
+      "losses": 0,
+      "matches_played": 0,
+      "is_banned": 0,
+      "created_at": "2026-05-29T06:03:50.169Z",
+      "updated_at": "2026-05-30T20:09:38.162Z",
+      "skin": "steve"
+    },
+    {
+      "id": "ac7c643d-b0a8-4a64-9a99-26776a22304e",
+      "discord_id": "1118003859621695618",
+      "discord_username": "2toned._.",
+      "discord_avatar": "https://cdn.discordapp.com/avatars/1118003859621695618/b5a0dff52f76c3b0be463a53d9c6952e.png",
+      "display_name": "2toned._.",
+      "parsec_link": "https://parsec.gg/g/3ENswMacKuUNDvNqVatM9CZszUM/f333042d/",
+      "elo": 1000,
+      "wins": 0,
+      "losses": 0,
+      "matches_played": 0,
+      "is_banned": 0,
+      "coins": 109200,
+      "attributes": {
+        "speed": 99,
+        "shooting": 99,
+        "dunking": 99,
+        "defense": 99
+      },
+      "created_at": "2026-05-29T23:43:04.117Z",
+      "updated_at": "2026-05-30T18:32:30.814Z"
+    }
+  ],
+  "matches": []
+}

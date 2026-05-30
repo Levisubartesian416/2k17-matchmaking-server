@@ -12,6 +12,7 @@ const { initBot } = require('./discord/bot');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const matchRoutes = require('./routes/matches');
+const storeRoutes = require('./routes/store');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,7 +20,8 @@ const io = new Server(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-// Middleware
+// Middleware (Must use raw for stripe webhook)
+app.use('/api/store/webhook', express.raw({type: 'application/json'}));
 app.use(cors());
 app.use(express.json());
 
@@ -30,6 +32,7 @@ db.init();
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/store', storeRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -39,6 +42,11 @@ app.get('/health', (req, res) => {
         uptime: process.uptime(),
         queue
     });
+});
+
+// Online player count
+app.get('/api/online-count', (req, res) => {
+    res.json({ count: io.engine.clientsCount || 0 });
 });
 
 // ── Socket.io matchmaking ──
@@ -80,6 +88,11 @@ io.on('connection', (socket) => {
             socket.emit('queue_left', { mode: result.mode });
         }
         io.emit('queue_sizes', queueManager.getQueueSizes());
+    });
+
+    // ── Map Voting ──
+    socket.on('vote_park', (parkId) => {
+        queueManager.registerParkVote(socket.userId, parkId);
     });
 
     // ── Report match result ──

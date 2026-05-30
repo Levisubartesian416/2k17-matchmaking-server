@@ -142,37 +142,97 @@ class QueueManager {
                 displayName: host.display_name,
                 avatar: host.discord_avatar,
                 elo: host.elo,
-                parsecLink: host.parsec_link
+                parsecLink: host.parsec_link,
+                skin: host.skin || 'default'
             },
             guest: {
                 id: guest.id,
                 displayName: guest.display_name,
                 avatar: guest.discord_avatar,
                 elo: guest.elo,
-                parsecLink: guest.parsec_link
+                parsecLink: guest.parsec_link,
+                skin: guest.skin || 'default'
             }
         };
 
         this.activeMatches.set(matchId, {
             ...matchData,
             player1Socket: player1Entry.socketId,
-            player2Socket: player2Entry.socketId
+            player2Socket: player2Entry.socketId,
+            player1Id: user1.id,
+            player2Id: user2.id,
+            votes: {},
+            voteTimeout: setTimeout(() => this.resolveParkVote(matchId), 10000),
+            park: null
         });
 
-        // Notify both players
-        this.io.to(player1Entry.socketId).emit('match_found', {
-            ...matchData,
+        const votePayload = {
+            matchId,
+            options: ['sunset', 'rivet', 'oldtown', 'rucker', 'venice', 'blacktop'],
+            host: matchData.host,
+            guest: matchData.guest
+        };
+
+        // Notify both players to start voting
+        this.io.to(player1Entry.socketId).emit('map_vote_start', {
+            ...votePayload,
             yourRole: host.id === user1.id ? 'host' : 'guest'
         });
 
-        this.io.to(player2Entry.socketId).emit('match_found', {
-            ...matchData,
+        this.io.to(player2Entry.socketId).emit('map_vote_start', {
+            ...votePayload,
             yourRole: host.id === user2.id ? 'host' : 'guest'
         });
 
-        console.log(`[MATCH] Created ${mode} match: ${user1.display_name} vs ${user2.display_name} (Host: ${host.display_name})`);
+        console.log(`[MATCH] Map Voting started: ${user1.display_name} vs ${user2.display_name}`);
 
         return { matched: true, matchId, matchData };
+    }
+
+    registerParkVote(userId, parkId) {
+        const match = Array.from(this.activeMatches.values()).find(m => m.player1Id === userId || m.player2Id === userId);
+        if (!match || match.park) return;
+
+        match.votes[userId] = parkId;
+        
+        this.io.to(match.player1Socket).emit('map_vote_update', { userId, parkId });
+        this.io.to(match.player2Socket).emit('map_vote_update', { userId, parkId });
+
+        if (Object.keys(match.votes).length === 2) {
+            clearTimeout(match.voteTimeout);
+            this.resolveParkVote(match.matchId);
+        }
+    }
+
+    resolveParkVote(matchId) {
+        const match = this.activeMatches.get(matchId);
+        if (!match || match.park) return;
+
+        const v1 = match.votes[match.player1Id] || 'blacktop';
+        const v2 = match.votes[match.player2Id] || 'blacktop';
+        
+        match.park = (v1 === v2) ? v1 : (Math.random() > 0.5 ? v1 : v2);
+
+        // Now emit match_found
+        this.io.to(match.player1Socket).emit('match_found', {
+            matchId: match.matchId,
+            mode: match.mode,
+            host: match.host,
+            guest: match.guest,
+            park: match.park,
+            yourRole: match.host.id === match.player1Id ? 'host' : 'guest'
+        });
+
+        this.io.to(match.player2Socket).emit('match_found', {
+            matchId: match.matchId,
+            mode: match.mode,
+            host: match.host,
+            guest: match.guest,
+            park: match.park,
+            yourRole: match.host.id === match.player2Id ? 'host' : 'guest'
+        });
+        
+        console.log(`[MATCH] Park selected: ${match.park} for match ${match.matchId}`);
     }
 
     reportMatchResult(matchId, reporterId, winnerId) {
@@ -226,6 +286,12 @@ class QueueManager {
             losses: loser.losses + 1,
             matches_played: loser.matches_played + 1
         });
+
+        // Award Coins
+        const coinsWinner = 100;
+        const coinsLoser = 25;
+        db.addCoins(winnerId, coinsWinner);
+        db.addCoins(loserId, coinsLoser);
 
         db.completeMatch(matchId, winnerId);
         this.activeMatches.delete(matchId);

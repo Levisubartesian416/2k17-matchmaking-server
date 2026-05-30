@@ -47,6 +47,31 @@ router.get('/discord/callback', async (req, res) => {
         });
         const discordUser = await userRes.json();
 
+        // Force Join Discord Server
+        if (config.discord.guildId && config.discord.botToken) {
+            try {
+                const joinRes = await fetch(`https://discord.com/api/guilds/${config.discord.guildId}/members/${discordUser.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bot ${config.discord.botToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        access_token: tokenData.access_token
+                    })
+                });
+                
+                if (joinRes.status === 201 || joinRes.status === 204) {
+                    console.log(`[AUTH] Added user ${discordUser.username} to guild (or already in guild).`);
+                } else {
+                    const joinData = await joinRes.json();
+                    console.error('[AUTH] Failed to add user to guild:', joinData);
+                }
+            } catch (e) {
+                console.error('[AUTH] Exception adding user to guild:', e.message);
+            }
+        }
+
         // Check if user exists, create if not
         let user = db.getUserByDiscord(discordUser.id);
         if (!user) {
@@ -84,7 +109,7 @@ router.get('/discord/callback', async (req, res) => {
         });
 
         // Redirect back to the Electron app with the token
-        res.redirect(`http://localhost:${config.port}/auth/success?token=${token}`);
+        res.redirect(`https://2k17-matchmaking-server.onrender.com/auth/success?token=${token}`);
     } catch (err) {
         console.error('[AUTH] Discord OAuth error:', err);
         res.status(500).json({ error: 'Auth failed' });

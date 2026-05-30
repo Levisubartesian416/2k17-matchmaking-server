@@ -34,6 +34,8 @@ function createUser({ id, discord_id, discord_username, discord_avatar, parsec_l
         display_name: discord_username, parsec_link,
         elo: config.matchmaking.eloDefault,
         wins: 0, losses: 0, matches_played: 0, is_banned: 0,
+        coins: 0,
+        attributes: { speed: 60, shooting: 60, dunking: 60, defense: 60 },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
@@ -54,7 +56,7 @@ function updateUser(id, fields) {
     const user = getUser(id);
     if (!user) return null;
 
-    const allowed = ['display_name', 'bio', 'parsec_link', 'discord_avatar', 'discord_username'];
+    const allowed = ['display_name', 'bio', 'parsec_link', 'discord_avatar', 'discord_username', 'skin'];
     for (const key of allowed) {
         if (fields[key] !== undefined) {
             user[key] = fields[key];
@@ -83,6 +85,45 @@ function banUser(id, banned) {
         user.is_banned = banned ? 1 : 0;
         save();
     }
+}
+
+function updateUserAttributes(id, attribute) {
+    const user = getUser(id);
+    if (!user) return null;
+    
+    // Ensure attributes object exists for legacy users
+    if (!user.attributes) user.attributes = { speed: 60, shooting: 60, dunking: 60, defense: 60 };
+
+    if (user.attributes[attribute] !== undefined) {
+        user.attributes[attribute] += 1;
+        user.updated_at = new Date().toISOString();
+        save();
+        return user;
+    }
+    return null;
+}
+
+function addCoins(id, amount) {
+    const user = getUser(id);
+    if (!user) return null;
+    
+    user.coins = (user.coins || 0) + amount;
+    user.updated_at = new Date().toISOString();
+    save();
+    return user;
+}
+
+function deductCoins(id, amount) {
+    const user = getUser(id);
+    if (!user) return null;
+    
+    if ((user.coins || 0) >= amount) {
+        user.coins -= amount;
+        user.updated_at = new Date().toISOString();
+        save();
+        return user;
+    }
+    return null;
 }
 
 function getLeaderboard(limit = 10) {
@@ -174,5 +215,6 @@ function getDB() {
 module.exports = {
     init, getDB,
     createUser, getUser, getUserByDiscord, updateUser, updateUserStats, banUser, getLeaderboard,
+    updateUserAttributes, addCoins, deductCoins,
     createMatch, getMatch, getActiveMatch, reportResult, completeMatch, cancelMatch, getMatchHistory
 };

@@ -11,6 +11,8 @@ router.get('/me', authMiddleware, (req, res) => {
     const rank = getRank(user.elo);
     res.json({
         ...user,
+        coins: user.coins || 0,
+        attributes: user.attributes || { speed: 60, shooting: 60, dunking: 60, defense: 60 },
         rank,
         winRate: user.matches_played > 0
             ? Math.round((user.wins / user.matches_played) * 100)
@@ -20,7 +22,7 @@ router.get('/me', authMiddleware, (req, res) => {
 
 // Update profile
 router.patch('/me', authMiddleware, (req, res) => {
-    const { display_name, bio, parsec_link } = req.body;
+    const { display_name, bio, parsec_link, skin } = req.body;
 
     // Validate parsec link format
     if (parsec_link !== undefined && parsec_link !== null && parsec_link !== '') {
@@ -38,7 +40,7 @@ router.patch('/me', authMiddleware, (req, res) => {
         return res.status(400).json({ error: 'Bio must be under 200 characters' });
     }
 
-    const updated = db.updateUser(req.user.id, { display_name, bio, parsec_link });
+    const updated = db.updateUser(req.user.id, { display_name, bio, parsec_link, skin });
     const rank = getRank(updated.elo);
     res.json({ ...updated, rank });
 });
@@ -83,6 +85,52 @@ router.get('/leaderboard/top', authMiddleware, (req, res) => {
             ? Math.round((p.wins / p.matches_played) * 100)
             : 0
     })));
+});
+
+// Upgrade Attribute
+router.post('/upgrade', authMiddleware, (req, res) => {
+    const { attribute } = req.body;
+    const user = req.user;
+    
+    if (!attribute || !['speed', 'shooting', 'dunking', 'defense'].includes(attribute)) {
+        return res.status(400).json({ error: 'Invalid attribute' });
+    }
+
+    const currentLevel = user.attributes ? user.attributes[attribute] : 60;
+    if (currentLevel >= 99) {
+        return res.status(400).json({ error: 'Attribute is maxed out' });
+    }
+
+    // Cost logic, e.g., 100 coins per upgrade
+    const cost = 100;
+    const coins = user.coins || 0;
+
+    if (coins < cost) {
+        return res.status(400).json({ error: 'Not enough coins' });
+    }
+
+    // Deduct coins
+    const updatedWithCoins = db.deductCoins(user.id, cost);
+    if (!updatedWithCoins) {
+         return res.status(400).json({ error: 'Failed to deduct coins' });
+    }
+
+    // Upgrade stat
+    const updatedUser = db.updateUserAttributes(user.id, attribute);
+    res.json({ success: true, coins: updatedUser.coins, attributes: updatedUser.attributes });
+});
+
+// Buy Coins (Mock Store)
+router.post('/buy-coins', authMiddleware, (req, res) => {
+    const { amount } = req.body;
+    const user = req.user;
+
+    if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const updatedUser = db.addCoins(user.id, amount);
+    res.json({ success: true, coins: updatedUser.coins });
 });
 
 module.exports = router;
