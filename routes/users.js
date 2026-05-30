@@ -8,11 +8,10 @@ const router = express.Router();
 // Get current user profile
 router.get('/me', authMiddleware, (req, res) => {
     const user = req.user;
-    const rank = getRank(user.elo);
+    const rank = getRank(user.rep_level || 1);
     res.json({
         ...user,
         coins: user.coins || 0,
-        attributes: user.attributes || { speed: 60, shooting: 60, dunking: 60, defense: 60 },
         rank,
         winRate: user.matches_played > 0
             ? Math.round((user.wins / user.matches_played) * 100)
@@ -22,7 +21,7 @@ router.get('/me', authMiddleware, (req, res) => {
 
 // Update profile
 router.patch('/me', authMiddleware, (req, res) => {
-    const { display_name, bio, parsec_link, skin } = req.body;
+    const { display_name, bio, parsec_link, skin, affiliation } = req.body;
 
     // Validate parsec link format
     if (parsec_link !== undefined && parsec_link !== null && parsec_link !== '') {
@@ -40,8 +39,8 @@ router.patch('/me', authMiddleware, (req, res) => {
         return res.status(400).json({ error: 'Bio must be under 200 characters' });
     }
 
-    const updated = db.updateUser(req.user.id, { display_name, bio, parsec_link, skin });
-    const rank = getRank(updated.elo);
+    const updated = db.updateUser(req.user.id, { display_name, bio, parsec_link, skin, affiliation });
+    const rank = getRank(updated.rep_level || 1);
     res.json({ ...updated, rank });
 });
 
@@ -50,7 +49,7 @@ router.get('/:id', authMiddleware, (req, res) => {
     const user = db.getUser(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const rank = getRank(user.elo);
+    const rank = getRank(user.rep_level || 1);
     res.json({
         id: user.id,
         display_name: user.display_name,
@@ -80,7 +79,7 @@ router.get('/leaderboard/top', authMiddleware, (req, res) => {
         wins: p.wins,
         losses: p.losses,
         matches_played: p.matches_played,
-        rankTier: getRank(p.elo),
+        rankTier: getRank(p.rep_level || 1),
         winRate: p.matches_played > 0
             ? Math.round((p.wins / p.matches_played) * 100)
             : 0
@@ -92,21 +91,36 @@ router.post('/upgrade', authMiddleware, (req, res) => {
     const { attribute } = req.body;
     const user = req.user;
     
-    if (!attribute || !['speed', 'shooting', 'dunking', 'defense'].includes(attribute)) {
+    const validStats = [
+        'close_shot', 'driving_layup', 'driving_dunk', 'standing_dunk', 'post_hook',
+        'mid_range', 'three_point', 'free_throw', 'post_fade',
+        'pass_accuracy', 'ball_handle', 'post_control',
+        'interior_def', 'perimeter_def', 'lateral_quickness', 'steal', 'block', 'off_rebound', 'def_rebound',
+        'speed', 'shooting', 'dunking', 'defense' // legacy support
+    ];
+    
+    if (!attribute || !validStats.includes(attribute)) {
         return res.status(400).json({ error: 'Invalid attribute' });
     }
 
-    const currentLevel = user.attributes ? user.attributes[attribute] : 60;
+    const activeBuild = user.builds && user.builds.find(b => b.id === user.active_build_id);
+    if (!activeBuild) return res.status(400).json({ error: 'No active build found' });
+
+    const currentLevel = activeBuild.attributes ? activeBuild.attributes[attribute] : 60;
     if (currentLevel >= 99) {
         return res.status(400).json({ error: 'Attribute is maxed out' });
     }
 
-    // Cost logic, e.g., 100 coins per upgrade
-    const cost = 100;
+    // Progressive Cost Logic (~500k to max)
+    let cost = 300;
+    if (currentLevel >= 71) cost = 500;
+    if (currentLevel >= 81) cost = 800;
+    if (currentLevel >= 91) cost = 1200;
+
     const coins = user.coins || 0;
 
     if (coins < cost) {
-        return res.status(400).json({ error: 'Not enough coins' });
+        return res.status(400).json({ error: `Not enough VC (Needs ${cost})` });
     }
 
     // Deduct coins
@@ -117,7 +131,38 @@ router.post('/upgrade', authMiddleware, (req, res) => {
 
     // Upgrade stat
     const updatedUser = db.updateUserAttributes(user.id, attribute);
-    res.json({ success: true, coins: updatedUser.coins, attributes: updatedUser.attributes });
+    const updatedActiveBuild = updatedUser.builds.find(b => b.id === updatedUser.active_build_id);
+    res.json({ success: true, coins: updatedUser.coins, attributes: updatedActiveBuild.attributes, active_build_id: updatedUser.active_build_id });
+});
+
+// ── Build Management ──
+
+router.post('/builds', authMiddleware, (req, res) => {
+    const { name, archetype } = req.body;
+    const user = req.user;
+    
+    if (!name || name.length < 2 || name.length > 24) {
+        return res.status(400).json({ error: 'Name must be 2-24 characters' });
+    }
+
+    const updatedUser = db.createBuild(user.id, name, archetype);
+    if (updatedUser.error) {
+        return res.status(400).json({ error: updatedUser.error });
+    }
+    
+    res.json({ success: true, user: updatedUser });
+});
+
+router.put('/builds/active', authMiddleware, (req, res) => {
+    const { buildId } = req.body;
+    const user = req.user;
+
+    const updatedUser = db.setActiveBuild(user.id, buildId);
+    if (!updatedUser) {
+        return res.status(400).json({ error: 'Build not found' });
+    }
+
+    res.json({ success: true, user: updatedUser });
 });
 
 // Buy Coins (Mock Store)
