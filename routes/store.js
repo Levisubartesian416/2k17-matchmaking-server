@@ -48,8 +48,8 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `https://2k17-matchmaking-server.onrender.com/api/store/success?amount=${amount}`,
-            cancel_url: `https://2k17-matchmaking-server.onrender.com/api/store/cancel`,
+            success_url: `https://twok17-matchmaking-server.onrender.com/api/store/success?amount=${amount}`,
+            cancel_url: `https://twok17-matchmaking-server.onrender.com/api/store/cancel`,
             metadata: {
                 userId,
                 vcAmount: amount

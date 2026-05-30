@@ -109,7 +109,7 @@ router.get('/discord/callback', async (req, res) => {
         });
 
         // Redirect back to the Electron app with the token
-        res.redirect(`https://2k17-matchmaking-server.onrender.com/auth/success?token=${token}`);
+        res.redirect(`https://twok17-matchmaking-server.onrender.com/auth/success?token=${token}`);
     } catch (err) {
         console.error('[AUTH] Discord OAuth error:', err);
         res.status(500).json({ error: 'Auth failed' });
