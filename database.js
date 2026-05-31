@@ -41,7 +41,7 @@ function createUser({ id, discord_id, discord_username, discord_avatar, parsec_l
         display_name: discord_username, parsec_link,
         elo: config.matchmaking.eloDefault,
         wins: 0, losses: 0, matches_played: 0, is_banned: 0,
-        coins: 0,
+        coins: 20000,
         affiliation: null,
         rep_exp: 0,
         rep_level: 1,
@@ -84,6 +84,12 @@ function getUser(id) {
         user.unlocked_skins = ['default'];
         save();
     }
+    
+    if (user && user.coins === undefined) {
+        user.coins = 20000;
+        save();
+    }
+
     return user;
 }
 
@@ -150,7 +156,7 @@ function updateUserAttributes(id, attribute) {
 }
 
 // ── Build Operations ──
-function createBuild(id, name, archetype) {
+function createBuild(id, name, archetype, position, height, weight) {
     const user = getUser(id);
     if (!user) return null;
 
@@ -160,6 +166,9 @@ function createBuild(id, name, archetype) {
         id: 'build_' + Date.now(),
         name: name || 'New Build',
         archetype: archetype || 'Balanced',
+        position: position || 'PG',
+        height: height || '6\'3"',
+        weight: weight || 190,
         attributes: { ...default2KStats },
         skin: 'default'
     };
